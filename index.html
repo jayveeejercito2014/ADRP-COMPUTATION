@@ -83,8 +83,8 @@
                 </button>
             </div>
             <div class="font-mono text-[10px] text-zinc-600 flex justify-between">
-                <span>v8.8 Live GitHub Sync</span>
-                <span>Cutoff & 1hr Min OT</span>
+                <span>v9.0 Live GitHub Sync</span>
+                <span>Flexi Shift Exact OT</span>
             </div>
         </div>
     </aside>
@@ -214,7 +214,7 @@
             <section id="timesheetView" class="hidden space-y-6">
                 <div class="bg-zinc-900 border border-amber-500/30 p-6 rounded-2xl">
                     <h1 class="text-2xl font-black text-amber-400">Flexi-Time Attendance & Rest Day OT Manager</h1>
-                    <p class="text-zinc-400 text-sm mt-1">Mon-Thu 10hr Flexi (7AM - 7PM Window). Regular OT requires minimum 1hr. Fri-Sun Rest Day OT (1.5x).</p>
+                    <p class="text-zinc-400 text-sm mt-1">Mon-Thu 10hr Flexi (7AM Earliest Start). Auto 12-1PM Break. Excess net hours count as OT (Min 1hr required). Fri-Sun RDOT (1.5x).</p>
                 </div>
 
                 <div class="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl space-y-4">
@@ -259,7 +259,7 @@
                         </div>
                         <div>
                             <label class="block text-xs text-zinc-400 font-bold mb-1">Time Out</label>
-                            <input type="text" id="tsTimeOut" value="18:00:00" oninput="updateLiveBreakdown()" class="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-zinc-100 font-mono">
+                            <input type="text" id="tsTimeOut" value="17:00:00" oninput="updateLiveBreakdown()" class="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-zinc-100 font-mono">
                         </div>
                         <div>
                             <button id="btnSaveAttendance" onclick="addAttendanceEntry()" class="w-full bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black px-4 py-2 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 h-[42px]">
@@ -1012,107 +1012,132 @@
         }
 
         function calculateWorkAndPay(dateStr, timeInStr, timeOutStr, monthlySalary, overrideDayType = "REGULAR") {
-            const dailyRate = monthlySalary / 22;
-            const hourlyRate = dailyRate / 8;
-            const minRate = hourlyRate / 60;
+    const dailyRate = monthlySalary / 22;
+    const hourlyRate = dailyRate / 8;
+    const minRate = hourlyRate / 60;
 
-            if (overrideDayType === "ABSENT") {
-                return { 
-                    renderedMinutes: 0, undertimeMins: 0, deduction: 0, absentDeduction: dailyRate,
-                    rdotPay: 0, regOtPay: 0, dayType: 'ABSENT', hrs: 0, mins: 0, multiplier: 1.0, hrsPay: 0, minsPay: 0 
-                };
-            }
+    if (overrideDayType === "ABSENT") {
+        return { 
+            renderedMinutes: 0, undertimeMins: 0, deduction: 0, absentDeduction: dailyRate,
+            rdotPay: 0, regOtPay: 0, dayType: 'ABSENT', hrs: 0, mins: 0, multiplier: 1.0, hrsPay: 0, minsPay: 0 
+        };
+    }
 
-            if (!timeInStr || !timeOutStr || !dateStr || !monthlySalary) {
-                return { renderedMinutes: 0, undertimeMins: 0, deduction: 0, absentDeduction: 0, rdotPay: 0, regOtPay: 0, dayType: 'REGULAR', hrs: 0, mins: 0, multiplier: 1.0, hrsPay: 0, minsPay: 0 };
-            }
+    if (!timeInStr || !timeOutStr || !dateStr || !monthlySalary) {
+        return { renderedMinutes: 0, undertimeMins: 0, deduction: 0, absentDeduction: 0, rdotPay: 0, regOtPay: 0, dayType: 'REGULAR', hrs: 0, mins: 0, multiplier: 1.0, hrsPay: 0, minsPay: 0 };
+    }
 
-            const LUNCH_START_SEC = 12 * 3600;
-            const LUNCH_END_SEC = 13 * 3600;
+    const LUNCH_START_SEC = 12 * 3600; // 12:00 PM
+    const LUNCH_END_SEC = 13 * 3600;   // 01:00 PM
 
-            const rawInSec = timeToSeconds(timeInStr);
-            const rawOutSec = timeToSeconds(timeOutStr);
+    const rawInSec = timeToSeconds(timeInStr);
+    const rawOutSec = timeToSeconds(timeOutStr);
 
-            const isRestDay = (overrideDayType === "RDOT");
+    const isRestDay = (overrideDayType === "RDOT");
 
-            if (isRestDay) {
-                const RDOT_EARLIEST_IN = 8 * 3600;
-                const RDOT_LATEST_OUT = 17 * 3600;
-                const multiplier = 1.50;
+    if (isRestDay) {
+        const RDOT_EARLIEST_IN = 8 * 3600;
+        const RDOT_LATEST_OUT = 17 * 3600;
+        const multiplier = 1.50;
 
-                let inSec = Math.max(rawInSec, RDOT_EARLIEST_IN);
-                let outSec = Math.min(rawOutSec, RDOT_LATEST_OUT);
+        let inSec = Math.max(rawInSec, RDOT_EARLIEST_IN);
+        let outSec = Math.min(rawOutSec, RDOT_LATEST_OUT);
 
-                if (outSec <= inSec) {
-                    return { renderedMinutes: 0, undertimeMins: 0, deduction: 0, absentDeduction: 0, rdotPay: 0, regOtPay: 0, dayType: 'RDOT', hrs: 0, mins: 0, multiplier, hrsPay: 0, minsPay: 0 };
-                }
+        if (outSec <= inSec) {
+            return { renderedMinutes: 0, undertimeMins: 0, deduction: 0, absentDeduction: 0, rdotPay: 0, regOtPay: 0, dayType: 'RDOT', hrs: 0, mins: 0, multiplier, hrsPay: 0, minsPay: 0 };
+        }
 
-                let totalSec = outSec - inSec;
-                if (inSec < LUNCH_END_SEC && outSec > LUNCH_START_SEC) {
-                    const overlapStart = Math.max(inSec, LUNCH_START_SEC);
-                    const overlapEnd = Math.min(outSec, LUNCH_END_SEC);
-                    totalSec -= Math.max(0, overlapEnd - overlapStart);
-                }
+        let totalSec = outSec - inSec;
+        if (inSec < LUNCH_END_SEC && outSec > LUNCH_START_SEC) {
+            const overlapStart = Math.max(inSec, LUNCH_START_SEC);
+            const overlapEnd = Math.min(outSec, LUNCH_END_SEC);
+            totalSec -= Math.max(0, overlapEnd - overlapStart);
+        }
 
-                const renderedMinutes = Math.floor(totalSec / 60);
-                const hrs = Math.floor(renderedMinutes / 60);
-                const mins = renderedMinutes % 60;
+        const renderedMinutes = Math.floor(totalSec / 60);
+        const hrs = Math.floor(renderedMinutes / 60);
+        const mins = renderedMinutes % 60;
 
-                const hrsPay = hourlyRate * hrs * multiplier;
-                const minsPay = minRate * mins * multiplier;
-                const rdotPay = hrsPay + minsPay;
+        const hrsPay = hourlyRate * hrs * multiplier;
+        const minsPay = minRate * mins * multiplier;
+        const rdotPay = hrsPay + minsPay;
 
-                return { renderedMinutes, undertimeMins: 0, deduction: 0, absentDeduction: 0, rdotPay, regOtPay: 0, dayType: 'RDOT', hrs, mins, multiplier, hrsPay, minsPay };
-            } else {
-                const FLEXI_START_SEC = 7 * 3600;
-                const FLEXI_END_SEC = 19 * 3600;
-                const REG_REQUIRED_MINS = 10 * 60;
+        return { renderedMinutes, undertimeMins: 0, deduction: 0, absentDeduction: 0, rdotPay, regOtPay: 0, dayType: 'RDOT', hrs, mins, multiplier, hrsPay, minsPay };
+    } else {
+        const FIXED_CUTOFF_OUT_SEC = 19 * 3600; // 7:00 PM Regular Limit
+        const REQUIRED_WORK_MINS = 10 * 60;     // 10 Hours Net Work Target
 
-                let inSec = Math.max(rawInSec, FLEXI_START_SEC);
-                let outSec = Math.min(rawOutSec, FLEXI_END_SEC);
+        // 1. REGULAR WORK TIME COMPUTATION (Kukwentahin lang sa loob ng In Time hanggang 7:00 PM limit)
+        let regShiftOut = Math.min(rawOutSec, FIXED_CUTOFF_OUT_SEC);
+        let regSec = 0;
 
-                let totalSec = 0;
-                if (outSec > inSec) {
-                    totalSec = outSec - inSec;
-                    if (inSec < LUNCH_END_SEC && outSec > LUNCH_START_SEC) {
-                        const overlapStart = Math.max(inSec, LUNCH_START_SEC);
-                        const overlapEnd = Math.min(outSec, LUNCH_END_SEC);
-                        totalSec -= Math.max(0, overlapEnd - overlapStart);
-                    }
-                }
-
-                let regRenderedMins = Math.floor(totalSec / 60);
-
-                let undertimeMins = 0;
-                let deduction = 0;
-                if (regRenderedMins < REG_REQUIRED_MINS) {
-                    undertimeMins = REG_REQUIRED_MINS - regRenderedMins;
-                    deduction = undertimeMins * minRate;
-                }
-
-                let otMins = 0;
-                if (rawOutSec > FLEXI_END_SEC) {
-                    otMins += Math.floor((rawOutSec - FLEXI_END_SEC) / 60);
-                } else if (regRenderedMins > REG_REQUIRED_MINS) {
-                    otMins += (regRenderedMins - REG_REQUIRED_MINS);
-                    regRenderedMins = REG_REQUIRED_MINS;
-                }
-
-                let hrs = 0, mins = 0, hrsPay = 0, minsPay = 0, regOtPay = 0;
-                const multiplier = 1.25;
-
-                // Minimum 1 hour required for Regular OT
-                if (otMins >= 60) {
-                    hrs = Math.floor(otMins / 60);
-                    mins = otMins % 60;
-                    hrsPay = hourlyRate * hrs * multiplier;
-                    minsPay = minRate * mins * multiplier;
-                    regOtPay = hrsPay + minsPay;
-                }
-
-                return { renderedMinutes: regRenderedMins + otMins, undertimeMins, deduction, absentDeduction: 0, rdotPay: 0, regOtPay, dayType: 'REGULAR', hrs, mins, multiplier, hrsPay, minsPay, rawOtMins: otMins };
+        if (regShiftOut > rawInSec) {
+            regSec = regShiftOut - rawInSec;
+            // Bawas 1-hour lunch break (12:00 PM - 1:00 PM)
+            if (rawInSec < LUNCH_END_SEC && regShiftOut > LUNCH_START_SEC) {
+                const overlapStart = Math.max(rawInSec, LUNCH_START_SEC);
+                const overlapEnd = Math.min(regShiftOut, LUNCH_END_SEC);
+                regSec -= Math.max(0, overlapEnd - overlapStart);
             }
         }
+
+        let regMinsRendered = Math.floor(regSec / 60);
+
+        // 2. UNDERTIME COMPUTATION (Strictly measured vs 10 hours required limit)
+        // Pag pumasok ng 8:13 AM to 7:00 PM = 587 mins lang. Kulang ng 13 mins -> May 13 mins Late/Undertime!
+        let undertimeMins = 0;
+        if (regMinsRendered < REQUIRED_WORK_MINS) {
+            undertimeMins = REQUIRED_WORK_MINS - regMinsRendered;
+        }
+        const deduction = undertimeMins * minRate;
+
+        // 3. TOTAL RENDERED WORK MINUTES (Pati Overtime)
+        let totalSec = Math.max(0, rawOutSec - rawInSec);
+        if (rawInSec < LUNCH_END_SEC && rawOutSec > LUNCH_START_SEC) {
+            const overlapStart = Math.max(rawInSec, LUNCH_START_SEC);
+            const overlapEnd = Math.min(rawOutSec, LUNCH_END_SEC);
+            totalSec -= Math.max(0, overlapEnd - overlapStart);
+        }
+        const totalRenderedMins = Math.floor(totalSec / 60);
+
+        // 4. OVERTIME COMPUTATION
+        // Makukuha ang OT alinman sa:
+        // A) Pumasok ng 7:00 AM at lumagpas ng 6:00 PM (10 hrs net work target)
+        // B) Anumang oras na lumagpas sa 7:00 PM
+        let otFromTarget = totalRenderedMins > REQUIRED_WORK_MINS ? (totalRenderedMins - REQUIRED_WORK_MINS) : 0;
+        let otFromCutoff = rawOutSec > FIXED_CUTOFF_OUT_SEC ? Math.floor((rawOutSec - FIXED_CUTOFF_OUT_SEC) / 60) : 0;
+
+        let otMins = Math.max(otFromTarget, otFromCutoff);
+
+        let hrs = 0, mins = 0, hrsPay = 0, minsPay = 0, regOtPay = 0;
+        const multiplier = 1.25;
+
+        // Minimum 1 hour (60 mins) threshold para mabilang ang OT Pay
+        if (otMins >= 60) {
+            hrs = Math.floor(otMins / 60);
+            mins = otMins % 60;
+            hrsPay = hourlyRate * hrs * multiplier;
+            minsPay = minRate * mins * multiplier;
+            regOtPay = hrsPay + minsPay;
+        }
+
+        return { 
+            renderedMinutes: totalRenderedMins, 
+            undertimeMins, 
+            deduction, 
+            absentDeduction: 0, 
+            rdotPay: 0, 
+            regOtPay, 
+            dayType: 'REGULAR', 
+            hrs, 
+            mins, 
+            multiplier, 
+            hrsPay, 
+            minsPay, 
+            rawOtMins: otMins 
+        };
+    }
+}
 
         function updateLiveBreakdown() {
             const empSelect = document.getElementById('tsEmployeeSelect');
@@ -1121,7 +1146,7 @@
             const empId = empSelect.value;
             const dateStr = document.getElementById('tsDate')?.value || "";
             const timeIn = document.getElementById('tsTimeIn')?.value || "07:00:00";
-            const timeOut = document.getElementById('tsTimeOut')?.value || "18:00:00";
+            const timeOut = document.getElementById('tsTimeOut')?.value || "17:00:00";
             const dayTypeOverride = document.getElementById('tsDayType')?.value || "REGULAR";
 
             const emp = employees.find(e => e.id === empId);
@@ -1156,14 +1181,12 @@
                 document.getElementById('calcTypeBadge').textContent = '(REST DAY OVERTIME: 1.50x Multiplier)';
                 document.getElementById('calcUndertimeDisplay').textContent = '';
             } else {
-                document.getElementById('calcTypeBadge').textContent = '(REGULAR FLEXI DAY: Min 1hr for OT)';
-                if (res.undertimeMins > 0) {
-                    document.getElementById('calcUndertimeDisplay').textContent = `Undertime: ${res.undertimeMins} mins (-\u20B1${res.deduction.toFixed(2)})`;
-                } else if (res.rawOtMins > 0 && res.rawOtMins < 60) {
-                    document.getElementById('calcUndertimeDisplay').textContent = `OT under 1hr threshold (${res.rawOtMins} mins) - Not counted as OT`;
-                } else {
-                    document.getElementById('calcUndertimeDisplay').textContent = 'Full Shift Completed';
-                }
+                document.getElementById('calcTypeBadge').textContent = '(REGULAR FLEXI DAY: Flexi Shift Exact OT, Min 1hr for OT)';
+                
+                let undertimeText = res.undertimeMins > 0 ? `Undertime: ${res.undertimeMins} mins (-\u20B1${res.deduction.toFixed(2)})` : 'Full Shift Completed';
+                let otThresholdText = (res.rawOtMins > 0 && res.rawOtMins < 60) ? ` | OT under 1hr threshold (${res.rawOtMins} mins)` : '';
+                
+                document.getElementById('calcUndertimeDisplay').textContent = undertimeText + otThresholdText;
             }
         }
 
@@ -1361,7 +1384,7 @@
             const date = document.getElementById('tsDate')?.value || "";
             const dayTypeOverride = document.getElementById('tsDayType')?.value || "REGULAR";
             const timeIn = document.getElementById('tsTimeIn')?.value || "07:00:00";
-            const timeOut = document.getElementById('tsTimeOut')?.value || "18:00:00";
+            const timeOut = document.getElementById('tsTimeOut')?.value || "17:00:00";
 
             const selectedMY = getSelectedMonthYear();
             const dateParts = date ? date.split('-') : [selectedMY.year, selectedMY.month, "15"];
@@ -1426,7 +1449,7 @@
             autoSetDayTypeFromDate();
             updateCutoffFromDate();
             if (document.getElementById('tsTimeIn')) document.getElementById('tsTimeIn').value = "07:00:00";
-            if (document.getElementById('tsTimeOut')) document.getElementById('tsTimeOut').value = "18:00:00";
+            if (document.getElementById('tsTimeOut')) document.getElementById('tsTimeOut').value = "17:00:00";
             updateLiveBreakdown();
         }
 
@@ -1714,180 +1737,136 @@
                 });
             }
 
-            const elemStatTotal = document.getElementById('statTotalEmployees');
-            const elemStatGross = document.getElementById('statGrossPay');
-            const elemStatDeduct = document.getElementById('statDeductions');
-            const elemStatNet = document.getElementById('statNetPay');
-
-            if (elemStatTotal) elemStatTotal.textContent = employees.length;
-            if (elemStatGross) elemStatGross.innerHTML = `&#8369;${grandGross.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-            if (elemStatDeduct) elemStatDeduct.innerHTML = `&#8369;${grandDeductions.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
-            if (elemStatNet) elemStatNet.innerHTML = `&#8369;${grandNet.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+            document.getElementById('statGrossPay').innerHTML = `&#8369;${grandGross.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('statDeductions').innerHTML = `&#8369;${grandDeductions.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            document.getElementById('statNetPay').innerHTML = `&#8369;${grandNet.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
         }
 
         function populatePayslipDropdown() {
             const select = document.getElementById('payslipEmployeeSelect');
             if(!select) return;
+
             select.innerHTML = '';
-
-            if (employees.length === 0) {
-                select.innerHTML = '<option value="">-- No Employees --</option>';
-            } else {
-                employees.forEach(e => {
-                    select.innerHTML += `<option value="${e.id}">${e.name}</option>`;
-                });
-            }
-
-            const psMonthPicker = document.getElementById('payslipMonthPicker');
-            if (psMonthPicker && !psMonthPicker.value) {
-                const { year, month } = getSelectedMonthYear();
-                psMonthPicker.value = `${year}-${month}`;
-            }
+            employees.forEach(e => {
+                select.innerHTML += `<option value="${e.id}">${e.name}</option>`;
+            });
 
             generatePayslipView();
         }
 
         function generatePayslipView() {
-            const empIdSelect = document.getElementById('payslipEmployeeSelect');
-            if(!empIdSelect || !empIdSelect.value) return;
+            const empSelect = document.getElementById('payslipEmployeeSelect');
+            if(!empSelect || !empSelect.value) return;
 
-            const empId = empIdSelect.value;
+            const empId = empSelect.value;
             const emp = employees.find(e => e.id === empId);
             if(!emp) return;
 
             const monthPicker = document.getElementById('payslipMonthPicker');
-            const monthStr = monthPicker ? monthPicker.value : "2026-09";
-            const [year, month] = monthStr.split('-');
-            const monthName = monthFullNames[month] || "September";
-            const monthIdx = parseInt(month) - 1;
-            const lastDay = getLastDayOfMonth(parseInt(year), monthIdx);
+            const selectedMY = monthPicker && monthPicker.value 
+                ? { year: monthPicker.value.split('-')[0], month: monthPicker.value.split('-')[1] }
+                : getSelectedMonthYear();
 
             const cutoffPeriod = document.getElementById('payslipCutoffSelect')?.value || "1";
             const payTypeMode = document.getElementById('payslipPayTypeSelect')?.value || "REGULAR";
 
-            const psHeaderTitle = document.getElementById('psHeaderTitle');
-            const psTypeBadge = document.getElementById('psTypeBadge');
-            const psPeriod = document.getElementById('psPayPeriod');
-            const noticeBanner = document.getElementById('psNoticeBanner');
+            const year = selectedMY.year;
+            const month = selectedMY.month;
+            const monthName = monthFullNames[month] || "September";
+            const lastDay = getLastDayOfMonth(parseInt(year), parseInt(month) - 1);
 
-            let dateRangeText = "";
-            let cutoffBadgeText = "";
+            let periodText = "";
+            if (cutoffPeriod === "1") periodText = `${monthName} 1 - 15, ${year} (1st Cut-off)`;
+            else if (cutoffPeriod === "2") periodText = `${monthName} 16 - ${lastDay}, ${year} (2nd Cut-off)`;
+            else periodText = `${monthName} 1 - ${lastDay}, ${year} (Whole Month)`;
 
-            if (cutoffPeriod === "1") {
-                dateRangeText = `${monthName} 1 - 15, ${year} (1st Cut-off)`;
-                cutoffBadgeText = "1ST CUT-OFF PAYSLIP";
-            } else if (cutoffPeriod === "2") {
-                dateRangeText = `${monthName} 16 - ${lastDay}, ${year} (2nd Cut-off)`;
-                cutoffBadgeText = "2ND CUT-OFF PAYSLIP";
-            } else {
-                dateRangeText = `${monthName} 1 - ${lastDay}, ${year} (Whole Month)`;
-                cutoffBadgeText = "WHOLE MONTH PAYSLIP";
-            }
+            document.getElementById('psPayPeriod').textContent = `Pay Period: ${periodText}`;
+            document.getElementById('psEmpName').textContent = emp.name;
+            document.getElementById('psEmpPosition').textContent = emp.position || "Employee";
 
-            if (payTypeMode === "OT_ONLY") {
-                if (psHeaderTitle) psHeaderTitle.textContent = "Separate Overtime Earnings Slip";
-                if (psTypeBadge) {
-                    psTypeBadge.textContent = "SEPARATE OVERTIME PAYSLIP";
-                    psTypeBadge.className = "inline-block px-3 py-0.5 mb-1 text-[10px] font-black uppercase rounded bg-amber-500/20 text-amber-400 border border-amber-500/40";
-                }
-                if (noticeBanner) {
-                    noticeBanner.className = "bg-amber-500/10 border border-amber-500/30 p-3 rounded-xl text-xs text-amber-300 flex items-center gap-2";
-                    noticeBanner.innerHTML = `<i class="fa-solid fa-clock text-amber-400 text-sm shrink-0"></i> <span><strong>Overtime Mode:</strong> Showing separate payout for Overtime (RDOT & Regular OT) for ${dateRangeText}. Basic salary and statutory deductions are handled in the regular cutoff payslip.</span>`;
-                }
-            } else {
-                if (psHeaderTitle) psHeaderTitle.textContent = "Official Cutoff Payslip";
-                if (psTypeBadge) {
-                    psTypeBadge.textContent = cutoffBadgeText;
-                    psTypeBadge.className = "inline-block px-3 py-0.5 mb-1 text-[10px] font-black uppercase rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
-                }
-                if (noticeBanner) {
-                    noticeBanner.className = "bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs text-zinc-400 flex items-center gap-2";
-                    noticeBanner.innerHTML = `<i class="fa-solid fa-circle-info text-amber-400 text-sm shrink-0"></i> <span><strong>Note:</strong> Overtime (RDOT & Regular OT) is <u>excluded</u> from 1st & 2nd cutoff regular payslips per company policy. Select "Separate Overtime Payslip" mode to generate standalone OT slips.</span>`;
-                }
-            }
+            const empLogs = timesheets.filter(t => 
+                t.empId === emp.id && 
+                isTimesheetInSelectedMonth(t, year, month) &&
+                (cutoffPeriod === "MONTH" || t.cutoffPeriod === cutoffPeriod)
+            );
 
-            if (psPeriod) psPeriod.textContent = `Pay Period: ${dateRangeText}`;
-
-            const empLogs = timesheets.filter(t => {
-                if (t.empId !== emp.id) return false;
-                if (!isTimesheetInSelectedMonth(t, year, month)) return false;
-
-                const dayNum = parseInt(t.date ? t.date.split('-')[2] : "1");
-                const entryCutoff = t.cutoffPeriod || (dayNum <= 15 ? "1" : "2");
-
-                if (cutoffPeriod === "MONTH") return true;
-                return entryCutoff === cutoffPeriod;
-            });
-
-            let calculatedRdot = 0;
-            let calculatedRegOt = 0;
-            let lateDeduction = 0;
-            let absentDeduction = 0;
+            let totalRdot = 0;
+            let totalRegOt = 0;
+            let totalLateDeduction = 0;
+            let totalAbsentDeduction = 0;
 
             empLogs.forEach(t => {
                 const computed = calculateWorkAndPay(t.date, t.timeIn, t.timeOut, emp.salary, t.dayType);
-                calculatedRdot += computed.rdotPay;
-                calculatedRegOt += computed.regOtPay;
-                lateDeduction += (computed.deduction || 0);
-                absentDeduction += (computed.absentDeduction || 0);
+                totalRdot += computed.rdotPay;
+                totalRegOt += computed.regOtPay;
+                totalLateDeduction += (computed.deduction || 0);
+                totalAbsentDeduction += (computed.absentDeduction || 0);
             });
 
-            let basicPay = 0;
-            let premiumPay = 0;
-            let rdotPay = 0;
-            let regOtPay = 0;
-            let statutory = { sss: 0, philhealth: 0, pagibig: 0, tax: 0, total: 0 };
+            const badge = document.getElementById('psTypeBadge');
+            const title = document.getElementById('psHeaderTitle');
+            const banner = document.getElementById('psNoticeBanner');
 
             if (payTypeMode === "OT_ONLY") {
-                basicPay = 0;
-                premiumPay = 0;
-                lateDeduction = 0;
-                absentDeduction = 0;
-                rdotPay = calculatedRdot;
-                regOtPay = calculatedRegOt;
-                statutory = { sss: 0, philhealth: 0, pagibig: 0, tax: 0, total: 0 };
-            } else {
-                rdotPay = 0;
-                regOtPay = 0;
-
-                if (cutoffPeriod === "MONTH") {
-                    basicPay = emp.salary;
-                    premiumPay = emp.premium || 0;
-                    statutory = getFullMonthlyDeductions(emp);
-                } else if (cutoffPeriod === "1") {
-                    basicPay = emp.salary / 2;
-                    premiumPay = 0;
-                    statutory = getCutoffScheduledDeductions(emp, "1");
-                } else if (cutoffPeriod === "2") {
-                    basicPay = emp.salary / 2;
-                    premiumPay = emp.premium || 0;
-                    statutory = getCutoffScheduledDeductions(emp, "2");
+                if (badge) {
+                    badge.textContent = "OVERTIME PAYSLIP (RDOT & REGULAR OT)";
+                    badge.className = "inline-block px-3 py-0.5 mb-1 text-[10px] font-black uppercase rounded bg-amber-500 text-zinc-950 border border-amber-400";
                 }
+                if (title) title.textContent = "Overtime Payslip";
+                if (banner) banner.classList.add('hidden');
+
+                document.getElementById('psBasicPay').innerHTML = `&#8369;0.00`;
+                document.getElementById('psPremiumPay').innerHTML = `&#8369;0.00`;
+                document.getElementById('psRdotPay').innerHTML = `&#8369;${totalRdot.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById('psRegOtPay').innerHTML = `&#8369;${totalRegOt.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+                const otGross = totalRdot + totalRegOt;
+                document.getElementById('psGrossPay').innerHTML = `&#8369;${otGross.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+                document.getElementById('psAbsentDeduction').innerHTML = `&#8369;0.00`;
+                document.getElementById('psLateDeduction').innerHTML = `&#8369;0.00`;
+                document.getElementById('psSss').innerHTML = `&#8369;0.00`;
+                document.getElementById('psPhilhealth').innerHTML = `&#8369;0.00`;
+                document.getElementById('psPagibig').innerHTML = `&#8369;0.00`;
+                document.getElementById('psTax').innerHTML = `&#8369;0.00`;
+                document.getElementById('psTotalDeductions').innerHTML = `&#8369;0.00`;
+
+                document.getElementById('psNetPay').innerHTML = `&#8369;${otGross.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+            } else {
+                if (badge) {
+                    badge.textContent = "REGULAR CUTOFF PAYSLIP";
+                    badge.className = "inline-block px-3 py-0.5 mb-1 text-[10px] font-black uppercase rounded bg-amber-500/20 text-amber-400 border border-amber-500/40";
+                }
+                if (title) title.textContent = "Official Payslip";
+                if (banner) banner.classList.remove('hidden');
+
+                const basicPay = cutoffPeriod === "MONTH" ? emp.salary : (emp.salary / 2);
+                const premiumPay = (cutoffPeriod === "2" || cutoffPeriod === "MONTH") ? (emp.premium || 0) : 0;
+
+                document.getElementById('psBasicPay').innerHTML = `&#8369;${basicPay.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById('psPremiumPay').innerHTML = `&#8369;${premiumPay.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById('psRdotPay').innerHTML = `&#8369;0.00 <span class="text-[10px] text-zinc-500 font-sans font-normal">(Excluded)</span>`;
+                document.getElementById('psRegOtPay').innerHTML = `&#8369;0.00 <span class="text-[10px] text-zinc-500 font-sans font-normal">(Excluded)</span>`;
+
+                const grossPay = basicPay + premiumPay;
+                document.getElementById('psGrossPay').innerHTML = `&#8369;${grossPay.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+                const statutory = getCutoffScheduledDeductions(emp, cutoffPeriod);
+
+                document.getElementById('psAbsentDeduction').innerHTML = `&#8369;${totalAbsentDeduction.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById('psLateDeduction').innerHTML = `&#8369;${totalLateDeduction.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById('psSss').innerHTML = `&#8369;${statutory.sss.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById('psPhilhealth').innerHTML = `&#8369;${statutory.philhealth.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById('psPagibig').innerHTML = `&#8369;${statutory.pagibig.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                document.getElementById('psTax').innerHTML = `&#8369;${statutory.tax.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+                const totalDeductions = statutory.total + totalLateDeduction + totalAbsentDeduction;
+                document.getElementById('psTotalDeductions').innerHTML = `&#8369;${totalDeductions.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+                const netPay = grossPay - totalDeductions;
+                document.getElementById('psNetPay').innerHTML = `&#8369;${netPay.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
             }
-
-            const grossPay = basicPay + premiumPay + rdotPay + regOtPay;
-            const totalDeductions = statutory.total + lateDeduction + absentDeduction;
-            const netPay = grossPay - totalDeductions;
-
-            // Fill Payslip DOM fields
-            document.getElementById('psEmpName').textContent = emp.name;
-            document.getElementById('psEmpPosition').textContent = emp.position;
-
-            document.getElementById('psBasicPay').innerHTML = `&#8369;${basicPay.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-            document.getElementById('psPremiumPay').innerHTML = `&#8369;${premiumPay.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-            document.getElementById('psRdotPay').innerHTML = `&#8369;${rdotPay.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-            document.getElementById('psRegOtPay').innerHTML = `&#8369;${regOtPay.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-            document.getElementById('psGrossPay').innerHTML = `&#8369;${grossPay.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-
-            document.getElementById('psAbsentDeduction').innerHTML = `&#8369;${absentDeduction.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-            document.getElementById('psLateDeduction').innerHTML = `&#8369;${lateDeduction.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-            document.getElementById('psSss').innerHTML = `&#8369;${statutory.sss.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-            document.getElementById('psPhilhealth').innerHTML = `&#8369;${statutory.philhealth.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-            document.getElementById('psPagibig').innerHTML = `&#8369;${statutory.pagibig.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-            document.getElementById('psTax').innerHTML = `&#8369;${statutory.tax.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-            document.getElementById('psTotalDeductions').innerHTML = `&#8369;${totalDeductions.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-
-            document.getElementById('psNetPay').innerHTML = `&#8369;${netPay.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
         }
 
         window.onload = function() {
@@ -1895,6 +1874,7 @@
             renderEmployees();
             populateTimesheetDropdown();
             renderTimesheets();
+            renderHistoryTable();
             processPayroll();
         };
     </script>
